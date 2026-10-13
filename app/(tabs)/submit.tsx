@@ -24,6 +24,7 @@ const leaveSubTypes = [
   { label: 'Casual Leave', value: 'Casual' },
   { label: 'Medical Leave', value: 'Medical' },
   { label: 'Emergency Leave', value: 'Emergency' },
+  { label: 'Half Day', value: 'Half Day' },
 ];
 
 /**
@@ -59,6 +60,7 @@ export default function SubmitLeaveScreen() {
     leaveDate: null as Date | null,
     fromTime: '',
     toTime: '',
+    halfDaySession: '' as '' | 'Morning' | 'Afternoon',
     reason: '',
     calculatedDuration: '',
   });
@@ -207,6 +209,9 @@ export default function SubmitLeaveScreen() {
     if (formData.leaveType === 'Compensation') {
       return (formData.workedDate && formData.leaveDate) ? '1 day (compensation)' : '';
     } else if (formData.leaveType === 'Leave' || formData.leaveType === 'On Duty') {
+      if (formData.leaveSubType === 'Half Day') {
+        return '0.5 days';
+      }
       if (!formData.fromDate) return '';
 
       if (formData.toDate) {
@@ -346,6 +351,16 @@ export default function SubmitLeaveScreen() {
     }
 
     if (formData.leaveType === 'Leave' || formData.leaveType === 'On Duty') {
+      if (formData.leaveSubType === 'Half Day') {
+        if (!formData.halfDaySession) {
+          Alert.alert('Error', 'Please select a session (Morning or Afternoon)');
+          return false;
+        }
+        if (!formData.fromTime || !formData.toTime) {
+          Alert.alert('Error', 'Please select from time and to time');
+          return false;
+        }
+      }
       if (formData.toDate && formData.fromDate && formData.fromDate > formData.toDate) {
         setFormData(prev => ({ ...prev, toDate: prev.fromDate }));
         Alert.alert('Error', 'To date cannot be before From date. Adjusted to match From date.');
@@ -497,6 +512,11 @@ export default function SubmitLeaveScreen() {
         requestData.fromDate = formData.fromDate!;
         requestData.toDate = formData.toDate || formData.fromDate;
         requestData.leaveSubType = formData.leaveSubType;
+        if (formData.leaveSubType === 'Half Day') {
+          requestData.fromTime = formData.fromTime;
+          requestData.toTime = formData.toTime;
+          requestData.halfDaySession = formData.halfDaySession;
+        }
       } else if (formData.leaveType === 'Permission') {
         requestData.fromDate = formData.fromDate!;
         requestData.toDate = formData.fromDate;
@@ -532,6 +552,7 @@ export default function SubmitLeaveScreen() {
         leaveDate: null,
         fromTime: '',
         toTime: '',
+        halfDaySession: '',
         reason: '',
         calculatedDuration: '',
       });
@@ -641,6 +662,7 @@ export default function SubmitLeaveScreen() {
                     toTime: '',
                     calculatedDuration: '',
                     leaveSubType: value === 'Leave' ? 'Casual' : '',
+                    halfDaySession: '',
                   }))}
                   containerStyle={styles.input}
                 />
@@ -650,9 +672,66 @@ export default function SubmitLeaveScreen() {
                     label="Leave Type"
                     options={leaveSubTypes}
                     value={formData.leaveSubType}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, leaveSubType: value }))}
+                    onValueChange={(value) => setFormData(prev => ({
+                      ...prev,
+                      leaveSubType: value,
+                      halfDaySession: '',
+                      fromTime: '',
+                      toTime: '',
+                    }))}
                     containerStyle={styles.input}
                   />
+                )}
+
+                {/* Half Day: session selector + editable time pickers */}
+                {formData.leaveType === 'Leave' && formData.leaveSubType === 'Half Day' && (
+                  <>
+                    <View style={styles.input}>
+                      <Text style={styles.label}>Session</Text>
+                      <View style={styles.halfDaySessionRow}>
+                        {(['Morning', 'Afternoon'] as const).map(session => {
+                          const isActive = formData.halfDaySession === session;
+                          return (
+                            <TouchableOpacity
+                              key={session}
+                              style={[styles.halfDayBtn, isActive && styles.halfDayBtnActive]}
+                              onPress={() => {
+                                const { startHour, endHour } = getCampusWorkHours(user?.campus);
+                                const from = session === 'Morning'
+                                  ? `${String(startHour).padStart(2, '0')}:00`
+                                  : '12:00';
+                                const to = session === 'Morning'
+                                  ? '12:00'
+                                  : `${String(endHour).padStart(2, '0')}:00`;
+                                setFormData(prev => ({ ...prev, halfDaySession: session, fromTime: from, toTime: to }));
+                              }}
+                            >
+                              <Text style={[styles.halfDayBtnText, isActive && styles.halfDayBtnTextActive]}>
+                                {session}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+
+                    {formData.halfDaySession !== '' && (
+                      <>
+                        <TimePicker
+                          label="From Time"
+                          value={formData.fromTime}
+                          onValueChange={(time) => setFormData(prev => ({ ...prev, fromTime: time }))}
+                          containerStyle={styles.input}
+                        />
+                        <TimePicker
+                          label="To Time"
+                          value={formData.toTime}
+                          onValueChange={(time) => setFormData(prev => ({ ...prev, toTime: time }))}
+                          containerStyle={styles.input}
+                        />
+                      </>
+                    )}
+                  </>
                 )}
 
                 {formData.leaveType === 'Compensation' ? (
@@ -725,7 +804,7 @@ export default function SubmitLeaveScreen() {
                   />
                 )}
 
-                {(formData.leaveType === 'Leave' || formData.leaveType === 'On Duty') && (
+                {(formData.leaveType === 'Leave' || formData.leaveType === 'On Duty') && formData.leaveSubType !== 'Half Day' && (
                   <DatePicker
                     label="To Date"
                     value={formData.toDate}
@@ -1251,5 +1330,30 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  halfDaySessionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfDayBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  halfDayBtnActive: {
+    backgroundColor: '#EC4899',
+    borderColor: '#EC4899',
+  },
+  halfDayBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  halfDayBtnTextActive: {
+    color: '#FFFFFF',
   },
 });
