@@ -360,6 +360,32 @@ export default function SubmitLeaveScreen() {
           Alert.alert('Error', 'Please select from time and to time');
           return false;
         }
+
+        const [fromHour, fromMinute] = formData.fromTime.split(':').map(Number);
+        const [toHour, toMinute] = formData.toTime.split(':').map(Number);
+        const fromMinutes = fromHour * 60 + fromMinute;
+        const toMinutes = toHour * 60 + toMinute;
+
+        const { startHour: wsH, endHour: weH } = getCampusWorkHours(user?.campus);
+        const workStartMins = wsH * 60;
+        const workEndMins   = weH * 60;
+        const startLabel = wsH < 12 ? `${wsH}:00 AM` : `${wsH - 12}:00 PM`;
+        const endLabel   = weH < 12 ? `${weH}:00 AM` : `${weH - 12}:00 PM`;
+
+        if (fromMinutes < workStartMins || fromMinutes > workEndMins) {
+          Alert.alert('Error', `From time must be between ${startLabel} and ${endLabel}`);
+          return false;
+        }
+
+        if (toMinutes < workStartMins || toMinutes > workEndMins) {
+          Alert.alert('Error', `To time must be between ${startLabel} and ${endLabel}`);
+          return false;
+        }
+
+        if (toMinutes <= fromMinutes) {
+          Alert.alert('Error', 'To time must be after From time');
+          return false;
+        }
       }
       if (formData.toDate && formData.fromDate && formData.fromDate > formData.toDate) {
         setFormData(prev => ({ ...prev, toDate: prev.fromDate }));
@@ -720,13 +746,53 @@ export default function SubmitLeaveScreen() {
                         <TimePicker
                           label="From Time"
                           value={formData.fromTime}
-                          onValueChange={(time) => setFormData(prev => ({ ...prev, fromTime: time }))}
+                          onValueChange={(time) => {
+                            const [h, m] = time.split(':').map(Number);
+                            const timeInMinutes = h * 60 + m;
+                            const { startHour, endHour } = getCampusWorkHours(user?.campus);
+                            const workStartMinutes = startHour * 60;
+                            const workEndMinutes   = endHour * 60;
+                            const startLabel = startHour < 12 ? `${startHour}:00 AM` : `${startHour - 12}:00 PM`;
+                            const endLabel   = endHour   < 12 ? `${endHour}:00 AM`   : `${endHour - 12}:00 PM`;
+
+                            if (timeInMinutes < workStartMinutes || timeInMinutes > workEndMinutes) {
+                              Alert.alert(
+                                'Invalid Time',
+                                `Please select a time between ${startLabel} and ${endLabel} (working hours only).`,
+                                [{ text: 'OK' }]
+                              );
+                              return;
+                            }
+                            setFormData(prev => ({ ...prev, fromTime: time }));
+                          }}
+                          minHour={getCampusWorkHours(user?.campus).startHour}
+                          maxHour={getCampusWorkHours(user?.campus).endHour}
                           containerStyle={styles.input}
                         />
                         <TimePicker
                           label="To Time"
                           value={formData.toTime}
-                          onValueChange={(time) => setFormData(prev => ({ ...prev, toTime: time }))}
+                          onValueChange={(time) => {
+                            const [h, m] = time.split(':').map(Number);
+                            const timeInMinutes = h * 60 + m;
+                            const { startHour, endHour } = getCampusWorkHours(user?.campus);
+                            const workStartMinutes = startHour * 60;
+                            const workEndMinutes   = endHour * 60;
+                            const startLabel = startHour < 12 ? `${startHour}:00 AM` : `${startHour - 12}:00 PM`;
+                            const endLabel   = endHour   < 12 ? `${endHour}:00 AM`   : `${endHour - 12}:00 PM`;
+
+                            if (timeInMinutes < workStartMinutes || timeInMinutes > workEndMinutes) {
+                              Alert.alert(
+                                'Invalid Time',
+                                `Please select a time between ${startLabel} and ${endLabel} (working hours only).`,
+                                [{ text: 'OK' }]
+                              );
+                              return;
+                            }
+                            setFormData(prev => ({ ...prev, toTime: time }));
+                          }}
+                          minHour={getCampusWorkHours(user?.campus).startHour}
+                          maxHour={getCampusWorkHours(user?.campus).endHour}
                           containerStyle={styles.input}
                         />
                       </>

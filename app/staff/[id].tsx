@@ -341,6 +341,15 @@ function StaffDetailScreen() {
   const loadStaffAndRequests = async () => {
     setLoading(true);
     try {
+      // Check viewer permissions: staff can only view their own calendar
+      const currentUser = await getCurrentUser();
+      setViewer(currentUser);
+      if (currentUser?.role === 'Staff' && currentUser.id !== id) {
+        Alert.alert('Access Denied', 'You can only view your own leave calendar.');
+        router.back();
+        return;
+      }
+
       // Get staff user info
       const userDoc = await getDoc(doc(db, 'users', id as string));
       setStaff(userDoc.exists() ? { ...userDoc.data(), id: userDoc.id } : null);
@@ -445,7 +454,7 @@ function StaffDetailScreen() {
 
         <Card style={styles.infoCard}>
           <CardHeader>
-            <Text style={styles.staffName}>{staff.name}</Text>
+            <Text style={styles.staffName}>{staff.name}{viewer?.id === staff.id ? ' (My Calendar)' : ''}</Text>
             <Text style={styles.staffDetails}>{staff.department} • ID: {staff.employeeId}</Text>
           </CardHeader>
           {viewer?.role === 'Director' && (

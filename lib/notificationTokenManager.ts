@@ -214,7 +214,8 @@ const sendNot = async (token: string, title: string, body: string, data?: Record
             return false;
         }
 
-        const response = await fetch("https://fcm.googleapis.com/v1/projects/7588322507/messages:send", {
+        const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || Constants.expoConfig?.extra?.firebase?.projectId || 'trackmyleavedummyprojfire';
+        const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
